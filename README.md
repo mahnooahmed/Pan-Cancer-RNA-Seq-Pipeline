@@ -29,6 +29,7 @@ OUTPUT_DIR     <- "path/to/output"
 MANIFEST_PATH  <- "path/to/gdc_manifest.txt"
 GENE_LIST_FILE <- "path/to/gene_list.xlsx"
 MAF_FILE       <- "path/to/mutations.maf"
+
 # 3. Run scripts in order
 PowerShell (Step 0):
 powershell.\scripts\00_arrange_files_by_cancer.ps1
@@ -39,11 +40,7 @@ source("scripts/03_verify_counts_matrix.R")
 source("scripts/04_build_tpm_subsets.R")
 source("scripts/05_deseq2_analysis.R")
 
-# Input Files
-FileDescriptiongdc_manifest.txtGDC download manifest (from GDC portal)gene_list.xlsxExcel file with E1, E2, E3, DUB gene symbol columns (sheet: COMBINED GENES)combined_pan_cancer.mafSomatic mutation MAF file for mutated vs wildtype analysisuuid_to_barcode_map.tsvMaps GDC file UUIDs to TCGA barcodes (generate from GDC API or portal)
 
-# Output Files
-FileDescriptionpan_cancer_counts_T.tsvSamples × genes integer count matrixpan_cancer_tpm_T.tsvSamples × genes TPM matrixgene_annotation.tsvEnsembl ID, gene symbol, gene type for all expressed genessample_metadata_clean.tsvSample ID, cancer type, sample group (Tumor/Normal/etc.)gdc_sample_types.tsvRaw GDC API response: file UUID, project ID, sample typeTPM_subsets/tpm_{E1,E2,E3,DUB}.tsvTPM subsets for each gene categoryTPM_subsets/gene_category_lookup.tsvEnsembl ID to gene symbol lookup per category{OUTPUT_DIR}/Tumor_vs_Normal/{group}/DEG results, volcano, PCA, heatmap per gene group{OUTPUT_DIR}/Mutated_vs_Wildtype/{group}/Same, for mutated vs wildtype comparison
 
 # Memory Notes
 The pipeline is designed to run on machines with 8 GB RAM and large datasets (~10,000+ samples):

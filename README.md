@@ -1,10 +1,29 @@
-# Pan-Cancer-RNA-Seq-Pipeline
-A reproducible pipeline for downloading, organising, and analysing TCGA RNA-seq data from the GDC portal. Builds a pan-cancer counts and TPM matrix from STAR-Counts files, then runs DESeq2 differential expression analysis with volcano plots, PCA, and ComplexHeatmap visualisations. 
-Pipeline Overview
-StepScriptDescription000_arrange_files_by_cancer.ps1Queries GDC API and organises downloaded TSV files into ByCancer/{CANCER}/ subfolders101_fetch_gdc_metadata.RFetches sample type and project ID for all file UUIDs via GDC API202_build_pan_cancer_matrices.RBuilds pan-cancer counts and TPM matrices (3-pass, memory-efficient)303_verify_counts_matrix.RQuality-checks the counts matrix (NAs, zeros, library sizes, housekeeping genes)404_build_tpm_subsets.RExtracts TPM subsets for gene categories (E1/E2/E3/DUB) from Excel gene list505_deseq2_analysis.RDESeq2 DE analysis + volcano, PCA, and ComplexHeatmap for each gene group
+# Pan-Cancer RNA-Seq Pipeline
 
-# Requirements
-R packages
+A reproducible pipeline for downloading, organising, and analysing TCGA RNA-seq data from the GDC portal. Builds a pan-cancer counts and TPM matrix from STAR-Counts files, then runs DESeq2 differential expression analysis with volcano plots, PCA, and ComplexHeatmap visualisations.
+
+This pipeline was developed to study ubiquitin-related gene (UBL) expression across TCGA cancer types, comparing Tumor vs Normal and Mutated vs Wildtype samples.
+
+---
+
+## Pipeline Overview
+
+| Step | Script | Description |
+|------|--------|-------------|
+| 0 | `00_arrange_files_by_cancer.ps1` | Queries GDC API and organises downloaded TSV files into `ByCancer/{CANCER}/` subfolders |
+| 1 | `01_fetch_gdc_metadata.R` | Fetches sample type and project ID for all file UUIDs via GDC API |
+| 2 | `02_build_pan_cancer_matrices.R` | Builds pan-cancer counts and TPM matrices (3-pass, memory-efficient) |
+| 3 | `03_verify_counts_matrix.R` | Quality-checks the counts matrix (NAs, zeros, library sizes, housekeeping genes) |
+| 4 | `04_build_tpm_subsets.R` | Extracts TPM subsets for gene categories (E1/E2/E3/DUB) from Excel gene list |
+| 5 | `05_deseq2_analysis.R` | DESeq2 DE analysis + volcano, PCA, and ComplexHeatmap for each gene group |
+
+---
+
+## Requirements
+
+### R packages
+
+```r
 # CRAN
 install.packages(c("data.table", "readxl", "stringr", "ggplot2", "ggrepel",
                    "dplyr", "readr", "tibble", "RColorBrewer", "circlize",
@@ -12,47 +31,93 @@ install.packages(c("data.table", "readxl", "stringr", "ggplot2", "ggrepel",
 
 # Bioconductor
 BiocManager::install(c("DESeq2", "ComplexHeatmap"))
-Other requirements
+```
 
-PowerShell 5.1+ (Windows) for Step 0
-Internet access for GDC API queries (Steps 0 and 1)
-GDC Data Transfer Tool for downloading raw files
+### Other requirements
+- PowerShell 5.1+ (Windows) for Step 0
+- Internet access for GDC API queries (Steps 0 and 1)
+- GDC Data Transfer Tool for downloading raw files
 
+---
 
-# Usage
-# 1. Download data from GDC
-Log in to the GDC Data Portal, select your cohort, and download STAR-Counts RNA-seq files using the GDC Data Transfer Tool. Save all UUID folders to a single directory (e.g. RNA-Seq/).
-# 2. Configure paths
-Edit config.R and set all paths to match your local directory structure. This is the only file you need to edit.
-rRNA_SEQ_DIR    <- "path/to/RNA-Seq"
+## Usage
+
+### 1. Download data from GDC
+Log in to the [GDC Data Portal](https://portal.gdc.cancer.gov/), select your cohort, and download STAR-Counts RNA-seq files using the GDC Data Transfer Tool. Save all UUID folders to a single directory (e.g. `RNA-Seq/`).
+
+### 2. Configure paths
+Edit `config.R` and set all paths to match your local directory structure. **This is the only file you need to edit.**
+
+```r
+RNA_SEQ_DIR    <- "path/to/RNA-Seq"
 OUTPUT_DIR     <- "path/to/output"
 MANIFEST_PATH  <- "path/to/gdc_manifest.txt"
 GENE_LIST_FILE <- "path/to/gene_list.xlsx"
 MAF_FILE       <- "path/to/mutations.maf"
+```
 
-# 3. Run scripts in order
-PowerShell (Step 0):
-powershell.\scripts\00_arrange_files_by_cancer.ps1
-R (Steps 1–5) — run from the repo root:
-rsource("scripts/01_fetch_gdc_metadata.R")
+### 3. Run scripts in order
+
+**PowerShell (Step 0):**
+```powershell
+.\scripts\00_arrange_files_by_cancer.ps1
+```
+
+**R (Steps 1–5) — run from the repo root:**
+```r
+source("scripts/01_fetch_gdc_metadata.R")
 source("scripts/02_build_pan_cancer_matrices.R")
 source("scripts/03_verify_counts_matrix.R")
 source("scripts/04_build_tpm_subsets.R")
 source("scripts/05_deseq2_analysis.R")
+```
 
+---
 
+## Input Files
 
-# Memory Notes
-The pipeline is designed to run on machines with 8 GB RAM and large datasets (~10,000+ samples):
+| File | Description |
+|------|-------------|
+| `gdc_manifest.txt` | GDC download manifest (from GDC portal) |
+| `gene_list.xlsx` | Excel file with E1, E2, E3, DUB gene symbol columns (sheet: `COMBINED GENES`) |
+| `combined_pan_cancer.maf` | Somatic mutation MAF file for mutated vs wildtype analysis |
+| `uuid_to_barcode_map.tsv` | Maps GDC file UUIDs to TCGA barcodes (generate from GDC API or portal) |
 
-Script 02 uses a 3-pass chunked approach; peak RAM per chunk is ~150 MB
-Script 05 loads only the gene rows needed for each analysis group
-Heatmaps subsample up to MAX_SAMPLES_HEAT per group (default: 150) for rendering
+---
 
-To reduce memory further, lower CHUNK_SIZE in config.R.
+## Output Files
 
-# Data Availability
-Raw data is available from the GDC Data Portal (TCGA programme). Data files are not included in this repository. All scripts are designed to be run against locally downloaded GDC STAR-Counts TSV files.
+| File | Description |
+|------|-------------|
+| `pan_cancer_counts_T.tsv` | Samples × genes integer count matrix |
+| `pan_cancer_tpm_T.tsv` | Samples × genes TPM matrix |
+| `gene_annotation.tsv` | Ensembl ID, gene symbol, gene type for all expressed genes |
+| `sample_metadata_clean.tsv` | Sample ID, cancer type, sample group (Tumor/Normal/etc.) |
+| `gdc_sample_types.tsv` | Raw GDC API response: file UUID, project ID, sample type |
+| `TPM_subsets/tpm_{E1,E2,E3,DUB}.tsv` | TPM subsets for each gene category |
+| `TPM_subsets/gene_category_lookup.tsv` | Ensembl ID to gene symbol lookup per category |
+| `{OUTPUT_DIR}/Tumor_vs_Normal/{group}/` | DEG results, volcano, PCA, heatmap per gene group |
+| `{OUTPUT_DIR}/Mutated_vs_Wildtype/{group}/` | Same, for mutated vs wildtype comparison |
 
-Reproducibility
-R package versions used during development are recorded in session_info.txt (generated by script 05). To reproduce results exactly, install the same package versions using renv or check the session info file.
+---
+
+## Memory Notes
+
+The pipeline is designed to run on machines with **8 GB RAM** and large datasets (~10,000+ samples):
+- Script 02 uses a 3-pass chunked approach; peak RAM per chunk is ~150 MB
+- Script 05 loads only the gene rows needed for each analysis group
+- Heatmaps subsample up to `MAX_SAMPLES_HEAT` per group (default: 150) for rendering
+
+To reduce memory further, lower `CHUNK_SIZE` in `config.R`.
+
+---
+
+## Data Availability
+
+Raw data is available from the [GDC Data Portal](https://portal.gdc.cancer.gov/) (TCGA programme). Data files are not included in this repository. All scripts are designed to be run against locally downloaded GDC STAR-Counts TSV files.
+
+---
+
+## Reproducibility
+
+R package versions used during development are recorded in `session_info.txt` (generated by script 05). To reproduce results exactly, install the same package versions using `renv` or check the session info file.
